@@ -180,6 +180,12 @@ DS = 0x52000
 CODE_OBJ = 0
 DATA_OBJ = 2
 
+# converting offsets inside mame
+# to_ds = lambda x: hex(x+0x342000)
+# from_ds = lambda x: hex(x-0x342000)
+# to_cs = lambda x: hex(x+0x35f000)
+# from_cs = lambda x: hex(x-0x35f000)
+
 """
 The game keeps track of the mouse in two ways; as a clamped (x, y) position in screen coordinates,
 and as a signed 16-bit x, y position that wraps and is unbound. The function we're patching has
@@ -317,6 +323,73 @@ nop
 DT_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
 DT_OFFSET = 0x36460
 
+"""
+The original control scheme has LCtrl/LAlt to drop eye level, LShift to raise eye level, and 
+E to restore to normal eye level. Let's simplify this to crouching while holding C, else restore
+to normal eye level.
+
+
+[pseudo]
+test keyboard_state[0x2e],3
+jz restore
+crouch:
+mov eax,movement_eye_level_incr
+sub movement_eye_level,eax
+mov eax,movement_eye_level
+cmp eax,movement_eye_level_min
+jge fin
+mov eax, movement_eye_level_min
+mov movement_eye_level,eax
+jmp fin
+
+restore:
+mov eax,movement_eye_level_incr
+add movement_eye_level,eax
+mov ebx,movement_eye_level_min
+add ebx,movement_eye_level_restore
+mov eax,movement_eye_level
+cmp eax,ebx
+jle fin
+mov movement_eye_level,ebx
+
+fin:
+and keyboard_state[0x2e],1
+
+ret
+
+[generic]
+test byte ptr [ds:0x3a1bf+0x2e],3
+jz restore
+crouch:
+mov eax,dword ptr [ds:0x1f365]
+sub dword ptr [ds:0x1f260],eax
+mov eax,dword ptr [ds:0x1f260]
+cmp eax,dword ptr [ds:0x1f389]
+jge fin
+mov eax, dword ptr [ds:0x1f389]
+mov dword ptr [ds:0x1f260],eax
+jmp fin
+
+restore:
+mov eax,dword ptr [ds:0x1f365]
+add dword ptr [ds:0x1f260],eax
+mov ebx,dword ptr [ds:0x1f389]
+add ebx,dword ptr [ds:0x1f264]
+mov eax,dword ptr [ds:0x1f260]
+cmp eax,ebx
+jle fin
+mov dword ptr [ds:0x1f260],ebx
+
+fin:
+and byte ptr [ds:0x3a1bf+0x2e],1
+ret
+
+"""
+
+CROUCH_MOD = b"\xF6\x05\xED\xA1\x03\x00\x03\x74\x24\xA1\x65\xF3\x01\x00\x29\x05\x60\xF2\x01\x00\xA1\x60\xF2\x01\x00\x3B\x05\x89\xF3\x01\x00\x7D\x32\xA1\x89\xF3\x01\x00\xA3\x60\xF2\x01\x00\xEB\x26\xA1\x65\xF3\x01\x00\x01\x05\x60\xF2\x01\x00\x8B\x1D\x89\xF3\x01\x00\x03\x1D\x64\xF2\x01\x00\xA1\x60\xF2\x01\x00\x39\xD8\x7E\x06\x89\x1D\x60\xF2\x01\x00\x80\x25\xED\xA1\x03\x00\x01\xC3"
+CROUCH_OFFSET = 0x380ae
+
+
 CREDIT_MOD = b"(c) 1993.        \rMouselook v0.9 (c) 2025 moralrecordings.    \r                                "
 CREDIT_OFFSET = DS + 0x1c18d
 
@@ -324,6 +397,7 @@ CODE_PATCHES = [
     (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
     (WASD_MOD, WASD_OFFSET),
     (DT_MOD, DT_OFFSET),
+    (CROUCH_MOD, CROUCH_OFFSET),
 ]
 
 DATA_PATCHES = [
@@ -382,12 +456,24 @@ for mod_code, mod_offset in CODE_PATCHES:
             case (iced_x86.Code.ADD_RM32_R32 | 
                   iced_x86.Code.MOV_RM32_IMM32 | 
                   iced_x86.Code.AND_R8_RM8 |
-                  iced_x86.Code.TEST_RM8_IMM8):
+                  iced_x86.Code.TEST_RM8_IMM8 |
+                  iced_x86.Code.CMP_R32_RM32 |
+                  iced_x86.Code.MOV_R32_RM32 |
+                  iced_x86.Code.ADD_R32_RM32 |
+                  iced_x86.Code.SUB_RM32_R32 |
+                  iced_x86.Code.AND_RM8_IMM8):
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
-        
-            case (iced_x86.Code.MOV_AL_MOFFS8):
+            case iced_x86.Code.MOV_RM32_R32:
+                # this bastard can have both memory and registers as a source operand
+                if instr.memory_displacement:
+                    fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
+                    print((page, None, hex(offset), fixup))
+                    fixup_records[page].append(fixup)
+            case (iced_x86.Code.MOV_AL_MOFFS8 |
+                  iced_x86.Code.MOV_MOFFS32_EAX |
+                  iced_x86.Code.MOV_EAX_MOFFS32):
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+1, utils.from_uint32_le(mod_code[instr.ip+1:instr.ip+5]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
