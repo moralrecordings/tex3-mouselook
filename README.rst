@@ -20,7 +20,7 @@ New keyboard controls
 Applying the patch
 ------------------
 
-The patch is in VCDIFF format, and requires TEX3.EXE from the GOG.com edition of Under a Killing Moon.
+The patch is in VCDIFF format, and requires TEX3.EXE from the GOG.com edition of Under a Killing Moon (sha1: 6aa11ae0e6e763849dd7f44c18ce1987c6763665).
 
 .. code:: bash
 
