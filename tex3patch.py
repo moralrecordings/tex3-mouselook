@@ -215,6 +215,83 @@ ret
 MOUSELOOK_CODE = b"\x89\xC8\xC1\xE0\x11\x01\x05\xA5\xF2\x01\x00\x89\xD0\xD1\xE0\x01\x05\xAD\xF2\x01\x00\x01\x05\x90\xF2\x01\x00\xC3"
 MOUSELOOK_OFFSET = CS + 0x364c3
 
+"""
+Replace the useless head-turning keyboard controls with code for WASD.
+
+W (keycode 0x11)
+A (keycode 0x1e)
+S (keycode 0x1f)
+D (keycode 0x20)
+
+[pseudo]
+mov movement_strafe,1
+mov movement_fwd_veloc,0
+mov al,keyboard_state[0x11]
+and al,keyboard_state[0x1f]
+jnz leftyrighty
+up:
+test keyboard_state[0x11],3
+jz down
+mov movement_fwd_veloc,-0x4000
+jmp leftyrighty
+down:
+test keyboard_state[0x1f],3
+jz leftyrighty
+mov movement_fwd_veloc,0x4000
+leftyrighty:
+mov movement_rot_veloc,0
+mov al,keyboard_state[0x1e]
+and al,keyboard_state[0x20]
+jnz fin
+left:
+test keyboard_state[0x1e],3
+jz right
+mov movement_rot_veloc,-0x8000
+jmp fin
+right:
+test keyboard_state[0x20],3
+jz fin
+mov movement_rot_veloc,0x8000
+fin:
+
+
+[generic]
+mov dword ptr [ds:0x1f35d],1
+mov dword ptr [ds:0x1f0e1],0
+mov al,[ds:0x3a1bf+0x11]
+and al,[ds:0x3a1bf+0x1f]
+jnz leftyrighty
+up:
+test byte ptr [ds:0x3a1bf+0x11],3
+jz down
+mov dword ptr [ds:0x1f0e1],-0x4000
+jmp leftyrighty
+down:
+test byte ptr [ds:0x3a1bf+0x1f],3
+jz leftyrighty
+mov dword ptr [ds:0x1f0e1],0x4000
+leftyrighty:
+mov dword ptr [ds:0x1f0dd],0
+mov al,[ds:0x3a1bf+0x1e]
+and al,[ds:0x3a1bf+0x20]
+jnz fin
+left:
+test byte ptr [ds:0x3a1bf+0x1e],3
+jz right
+mov dword ptr [ds:0x1f0dd],-0x8000
+jmp fin
+right:
+test byte ptr [ds:0x3a1bf+0x20],3
+jz fin
+mov dword ptr [ds:0x1f0dd],0x8000
+fin:
+"""
+
+WASD_MOD = b"\xC7\x05\x5D\xF3\x01\x00\x01\x00\x00\x00\xC7\x05\xE1\xF0\x01\x00\x00\x00\x00\x00\xA0\xD0\xA1\x03\x00\x22\x05\xDE\xA1\x03\x00\x75\x28\xF6\x05\xD0\xA1\x03\x00\x03\x74\x0C\xC7\x05\xE1\xF0\x01\x00\x00\xC0\xFF\xFF\xEB\x13\xF6\x05\xDE\xA1\x03\x00\x03\x74\x0A\xC7\x05\xE1\xF0\x01\x00\x00\x40\x00\x00\xC7\x05\xDD\xF0\x01\x00\x00\x00\x00\x00\xA0\xDD\xA1\x03\x00\x22\x05\xDF\xA1\x03\x00\x75\x28\xF6\x05\xDD\xA1\x03\x00\x03\x74\x0C\xC7\x05\xDD\xF0\x01\x00\x00\x80\xFF\xFF\xEB\x13\xF6\x05\xDF\xA1\x03\x00\x03\x74\x0A\xC7\x05\xDD\xF0\x01\x00\x00\x80\x00\x00"
+WASD_OFFSET = CS + 0x3839c
+# NOP until the end
+WASD_MOD += b"\x90"*(0x3851e - WASD_OFFSET - len(WASD_MOD))
+
 
 CREDIT_MOD = b"(c) 1993.        \rMouselook v0.9 (c) 2025 moralrecordings.    \r                                "
 CREDIT_OFFSET = DS + 0x1c18d
@@ -240,37 +317,51 @@ page_data = bytearray(page_data_orig)
 
 iff = iced_x86.InstructionInfoFactory()
 
-PATCH_RANGE = (MOUSELOOK_OFFSET, MOUSELOOK_OFFSET + len(MOUSELOOK_CODE))
 
-print("Fixups to remove:")
-for i in range(len(fixup_records)):
-    page_offset = i*le_header.page_size
-    if page_offset >= PATCH_RANGE[1] or (page_offset + le_header.page_size) < PATCH_RANGE[0]:
-        continue
-    to_remove = []
-    for j, record in enumerate(fixup_records[i]):
-        src_addr = (record.srcoff + page_offset)
-        if src_addr in range(PATCH_RANGE[0], PATCH_RANGE[1]):
-            print((i, j, hex(src_addr), record))
-            to_remove.append(j)
-    to_remove.reverse()
-    for j in to_remove:
-        fixup_records[i].pop(j)
-print("Fixups to add:")
-for mod_code, mod_offset in [(MOUSELOOK_CODE, MOUSELOOK_OFFSET)]:
+for mod_code, mod_offset in [(MOUSELOOK_CODE, MOUSELOOK_OFFSET), (WASD_MOD, WASD_OFFSET)]:
+    print("Fixups to remove:")
+    PATCH_RANGE = (mod_offset, mod_offset + len(mod_code))
+    for i in range(len(fixup_records)):
+        page_offset = i*le_header.page_size
+        if page_offset >= PATCH_RANGE[1] or (page_offset + le_header.page_size) < PATCH_RANGE[0]:
+            continue
+        to_remove = []
+        for j, record in enumerate(fixup_records[i]):
+            src_addr = (record.srcoff + page_offset)
+            if src_addr in range(PATCH_RANGE[0], PATCH_RANGE[1]):
+                print((i, j, hex(src_addr), record))
+                to_remove.append(j)
+        to_remove.reverse()
+        for j in to_remove:
+            fixup_records[i].pop(j)
+    print("Fixups to add:")
     decoder = iced_x86.Decoder(32, mod_code)
     for instr in decoder:
-        print(instr)
+        print((instr, instr.code))
         offset = mod_offset + instr.ip
         code = instr.code
         srcoff = offset % le_header.page_size
         page = offset // le_header.page_size
         # this is incomplete, there's god knows how many instructions in x86 which access memory.
         # I'm just adding them when I need them 
-        if code == iced_x86.Code.ADD_RM32_R32:
-            fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
-            print((page, None, hex(offset), fixup))
-            fixup_records[page].append(fixup)
+        match code:
+            case (iced_x86.Code.ADD_RM32_R32 | 
+                  iced_x86.Code.MOV_RM32_IMM32 | 
+                  iced_x86.Code.AND_R8_RM8 |
+                  iced_x86.Code.TEST_RM8_IMM8):
+                fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
+                print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
+        
+            case (iced_x86.Code.MOV_AL_MOFFS8):
+                fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+1, utils.from_uint32_le(mod_code[instr.ip+1:instr.ip+5]))
+                print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
+            case (iced_x86.Code.JMP_RM32):
+                fixup = FixupTuple("fix_32off_32", 0x7, 0x10, CODE_OBJ, srcoff+3, utils.from_uint32_le(mod_code[instr.ip+3:instr.ip+7]))
+                print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
+
 
     page_data[mod_offset:mod_offset+len(mod_code)] = mod_code
 
