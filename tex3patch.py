@@ -217,6 +217,7 @@ MOUSELOOK_OFFSET = CS + 0x364c3
 
 """
 Replace the useless head-turning keyboard controls with code for WASD.
+This reuses the original counters for forward and sideways velocity.
 
 W (keycode 0x11)
 A (keycode 0x1e)
@@ -293,8 +294,41 @@ WASD_OFFSET = CS + 0x3839c
 WASD_MOD += b"\x90"*(0x3851e - WASD_OFFSET - len(WASD_MOD))
 
 
+"""
+The game engine measures the number of ticks between redraws, and multiplies this delta time value 
+by the movement velocity to get the displacement.
+
+For reasons that are unclear, if 0 ticks have elapsed, the engine rounds this up to 4.
+Which means e.g. in areas of low geometry, Tex will start rocketing around far too quickly.
+This happens in the original movement code as well, adding to the difficulty of the controls.
+Fix this by nopping out that section of code.
+
+nop
+nop
+nop
+nop
+nop
+nop
+nop
+
+"""
+
+
+DT_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
+DT_OFFSET = 0x36460
+
 CREDIT_MOD = b"(c) 1993.        \rMouselook v0.9 (c) 2025 moralrecordings.    \r                                "
 CREDIT_OFFSET = DS + 0x1c18d
+
+CODE_PATCHES = [
+    (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
+    (WASD_MOD, WASD_OFFSET),
+    (DT_MOD, DT_OFFSET),
+]
+
+DATA_PATCHES = [
+    (CREDIT_MOD, CREDIT_OFFSET)
+]
 
 
 f = open('TEX3.EXE', 'rb').read()
@@ -318,7 +352,7 @@ page_data = bytearray(page_data_orig)
 iff = iced_x86.InstructionInfoFactory()
 
 
-for mod_code, mod_offset in [(MOUSELOOK_CODE, MOUSELOOK_OFFSET), (WASD_MOD, WASD_OFFSET)]:
+for mod_code, mod_offset in CODE_PATCHES:
     print("Fixups to remove:")
     PATCH_RANGE = (mod_offset, mod_offset + len(mod_code))
     for i in range(len(fixup_records)):
@@ -365,7 +399,7 @@ for mod_code, mod_offset in [(MOUSELOOK_CODE, MOUSELOOK_OFFSET), (WASD_MOD, WASD
 
     page_data[mod_offset:mod_offset+len(mod_code)] = mod_code
 
-for mod_data, mod_offset in [(CREDIT_MOD, CREDIT_OFFSET)]:
+for mod_data, mod_offset in DATA_PATCHES:
     page_data[mod_offset:mod_offset+len(mod_data)] = mod_data
 
 with open("TEXMOD.EXE", "wb") as out:
