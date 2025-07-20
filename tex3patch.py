@@ -223,78 +223,108 @@ MOUSELOOK_OFFSET = CS + 0x364c3
 
 """
 Replace the useless head-turning keyboard controls with code for WASD.
-This reuses the original counters for forward and sideways velocity.
+This reuses the original counters for forward and sideways velocity.+
+Double the speed if shift is held down.
 
 W (keycode 0x11)
 A (keycode 0x1e)
 S (keycode 0x1f)
 D (keycode 0x20)
+LShift (keycode 0x2a)
 
 [pseudo]
 mov movement_strafe,1
-mov movement_fwd_veloc,0
-mov al,keyboard_state[0x11]
-and al,keyboard_state[0x1f]
-jnz leftyrighty
+
 up:
+xor eax,eax
 test keyboard_state[0x11],3
 jz down
-mov movement_fwd_veloc,-0x4000
-jmp leftyrighty
+sub eax,0x4000
+
 down:
 test keyboard_state[0x1f],3
 jz leftyrighty
-mov movement_fwd_veloc,0x4000
+add eax,0x4000
+
 leftyrighty:
-mov movement_rot_veloc,0
-mov al,keyboard_state[0x1e]
-and al,keyboard_state[0x20]
-jnz fin
+test keyboard_state[0x2a],3
+jz apply_fwd
+shl eax,1
+apply_fwd:
+mov movement_fwd_veloc_world,eax
+
 left:
+xor eax,eax
 test keyboard_state[0x1e],3
 jz right
-mov movement_rot_veloc,-0x8000
-jmp fin
+sub eax,0xc000
+
 right:
 test keyboard_state[0x20],3
 jz fin
-mov movement_rot_veloc,0x8000
+add eax,0xc000
+
 fin:
+test keyboard_state[0x2a],3
+jz apply_strafe
+shl eax,1
+apply_strafe:
+mov movement_strafe_veloc_world,eax
+
+and keyboard_state[0x11],1
+and keyboard_state[0x1f],1
+and keyboard_state[0x1e],1
+and keyboard_state[0x20],1
+and keyboard_state[0x2a],1
 
 
 [generic]
 mov dword ptr [ds:0x1f35d],1
-mov dword ptr [ds:0x1f0e1],0
-mov al,[ds:0x3a1bf+0x11]
-and al,[ds:0x3a1bf+0x1f]
-jnz leftyrighty
+
 up:
+xor eax,eax
 test byte ptr [ds:0x3a1bf+0x11],3
 jz down
-mov dword ptr [ds:0x1f0e1],-0x4000
-jmp leftyrighty
+sub eax,0x4000
+
 down:
 test byte ptr [ds:0x3a1bf+0x1f],3
 jz leftyrighty
-mov dword ptr [ds:0x1f0e1],0x4000
+add eax,0x4000
+
 leftyrighty:
-mov dword ptr [ds:0x1f0dd],0
-mov al,[ds:0x3a1bf+0x1e]
-and al,[ds:0x3a1bf+0x20]
-jnz fin
+test byte ptr [ds:0x3a1bf+0x2a],3
+jz apply_fwd
+shl eax,1
+apply_fwd:
+mov dword ptr [ds:0x1f0e1],eax
+
 left:
+xor eax,eax
 test byte ptr [ds:0x3a1bf+0x1e],3
 jz right
-mov dword ptr [ds:0x1f0dd],-0x8000
-jmp fin
+sub eax,0xc000
+
 right:
 test byte ptr [ds:0x3a1bf+0x20],3
 jz fin
-mov dword ptr [ds:0x1f0dd],0x8000
+add eax,0xc000
+
 fin:
+test byte ptr [ds:0x3a1bf+0x2a],3
+jz apply_strafe
+shl eax,1
+apply_strafe:
+mov dword ptr [ds:0x1f0dd],eax
+
+and byte ptr [ds:0x3a1bf+0x11],1
+and byte ptr [ds:0x3a1bf+0x1f],1
+and byte ptr [ds:0x3a1bf+0x1e],1
+and byte ptr [ds:0x3a1bf+0x20],1
+and byte ptr [ds:0x3a1bf+0x2a],1
 """
 
-WASD_MOD = b"\xC7\x05\x5D\xF3\x01\x00\x01\x00\x00\x00\xC7\x05\xE1\xF0\x01\x00\x00\x00\x00\x00\xA0\xD0\xA1\x03\x00\x22\x05\xDE\xA1\x03\x00\x75\x28\xF6\x05\xD0\xA1\x03\x00\x03\x74\x0C\xC7\x05\xE1\xF0\x01\x00\x00\xC0\xFF\xFF\xEB\x13\xF6\x05\xDE\xA1\x03\x00\x03\x74\x0A\xC7\x05\xE1\xF0\x01\x00\x00\x40\x00\x00\xC7\x05\xDD\xF0\x01\x00\x00\x00\x00\x00\xA0\xDD\xA1\x03\x00\x22\x05\xDF\xA1\x03\x00\x75\x28\xF6\x05\xDD\xA1\x03\x00\x03\x74\x0C\xC7\x05\xDD\xF0\x01\x00\x00\x80\xFF\xFF\xEB\x13\xF6\x05\xDF\xA1\x03\x00\x03\x74\x0A\xC7\x05\xDD\xF0\x01\x00\x00\x80\x00\x00"
+WASD_MOD = b"\xC7\x05\x5D\xF3\x01\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xD0\xA1\x03\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xDE\xA1\x03\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xE1\xF0\x01\x00\x31\xC0\xF6\x05\xDD\xA1\x03\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xDF\xA1\x03\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xDD\xF0\x01\x00\x80\x25\xD0\xA1\x03\x00\x01\x80\x25\xDE\xA1\x03\x00\x01\x80\x25\xDD\xA1\x03\x00\x01\x80\x25\xDF\xA1\x03\x00\x01\x80\x25\xE9\xA1\x03\x00\x01"
 WASD_OFFSET = CS + 0x3839c
 # NOP until the end
 WASD_MOD += b"\x90"*(0x3851e - WASD_OFFSET - len(WASD_MOD))
@@ -450,7 +480,7 @@ for mod_code, mod_offset in CODE_PATCHES:
         code = instr.code
         srcoff = offset % le_header.page_size
         page = offset // le_header.page_size
-        # this is incomplete, there's god knows how many instructions in x86 which access memory.
+        # this is incomplete, there's hundreds of instructions in x86 which access memory.
         # I'm just adding them when I need them 
         match code:
             case (iced_x86.Code.ADD_RM32_R32 | 
