@@ -87,18 +87,21 @@ def search_for_le(exe: bytes) -> tuple[int, int]:
     result = []
     while ptr < len(exe):
         header = exe[ptr:ptr+64]
-        if header[0:2] in (b'MZ', b'BW'):
+        magic = header[0:2]
+        if magic in (b'MZ', b'BW'):
             relocation_table_offset = utils.from_uint16_le(header[0x18:0x1a])
             if relocation_table_offset == 0x40:
                 code32_start = utils.from_uint16_le(header[0x3c:0x3e])
                 if code32_start != 0:
-                    print("Found LE inside!")
+                    print(f"Found {magic} at 0x{ptr:08x}")
+                    print(f"Found LE at 0x{ptr+code32_start:08x}")
                     return (ptr, ptr+code32_start)
             page_count = utils.from_uint16_le(header[0x4:0x6])
             last_page_bytes = utils.from_uint16_le(header[0x2:0x4])
             total_size = (page_count << 9) + last_page_bytes
-            if header[0:2] == b'MZ':
+            if magic == b'MZ':
                 total_size -= 0x200
+            print(f"Found {magic} at 0x{ptr:08x}, size 0x{total_size:08x}, end offset 0x{ptr+total_size:08x}")
             result.append((header[0:2], exe[ptr:ptr+total_size]))
             ptr += total_size
         else:
@@ -196,7 +199,7 @@ we want to ignore those and instead mod the variables that track the player's ro
 Movement tilt ranges from -0x384 (ceiling) to 0x384 (floor)
 Movement rotation ranges from 0 to ~0xd000000
 
-Inject at 0x364c3:
+Inject at 0x59b3f:
 
 [pseudo]
 mov eax, ecx
@@ -211,15 +214,15 @@ ret
 [generic]
 mov eax, ecx
 shl eax, 17
-add ds:[0x1f2a5], eax
+add ds:[0x315fd], eax
 mov eax, edx
 shl eax, 1
-add ds:[0x1f2ad], eax 
-add ds:[0x1f290], eax 
+add ds:[0x31605], eax 
+add ds:[0x315e8], eax 
 ret
 """
-MOUSELOOK_CODE = b"\x89\xC8\xC1\xE0\x11\x01\x05\xA5\xF2\x01\x00\x89\xD0\xD1\xE0\x01\x05\xAD\xF2\x01\x00\x01\x05\x90\xF2\x01\x00\xC3"
-MOUSELOOK_OFFSET = CS + 0x364c3
+MOUSELOOK_CODE = b"\x89\xC8\xC1\xE0\x11\x01\x05\xFD\x15\x03\x00\x89\xD0\xD1\xE0\x01\x05\x05\x16\x03\x00\x01\x05\xE8\x15\x03\x00\xC3"
+MOUSELOOK_OFFSET = CS + 0x59b73
 
 """
 Replace the useless head-turning keyboard controls with code for WASD.
@@ -239,12 +242,12 @@ up:
 xor eax,eax
 test keyboard_state[0x11],3
 jz down
-sub eax,0x4000
+sub eax,0x8000
 
 down:
 test keyboard_state[0x1f],3
 jz leftyrighty
-add eax,0x4000
+add eax,0x8000
 
 leftyrighty:
 test keyboard_state[0x2a],3
@@ -279,55 +282,55 @@ and keyboard_state[0x2a],1
 
 
 [generic]
-mov dword ptr [ds:0x1f35d],1
+mov dword ptr [ds:0x316b5],1
 
 up:
 xor eax,eax
-test byte ptr [ds:0x3a1bf+0x11],3
+test byte ptr [ds:0x461af+0x11],3
 jz down
-sub eax,0x4000
+sub eax,0x8000
 
 down:
-test byte ptr [ds:0x3a1bf+0x1f],3
+test byte ptr [ds:0x461af+0x1f],3
 jz leftyrighty
-add eax,0x4000
+add eax,0x8000
 
 leftyrighty:
-test byte ptr [ds:0x3a1bf+0x2a],3
+test byte ptr [ds:0x461af+0x2a],3
 jz apply_fwd
 shl eax,1
 apply_fwd:
-mov dword ptr [ds:0x1f0e1],eax
+mov dword ptr [ds:0x31445],eax
 
 left:
 xor eax,eax
-test byte ptr [ds:0x3a1bf+0x1e],3
+test byte ptr [ds:0x461af+0x1e],3
 jz right
 sub eax,0xc000
 
 right:
-test byte ptr [ds:0x3a1bf+0x20],3
+test byte ptr [ds:0x461af+0x20],3
 jz fin
 add eax,0xc000
 
 fin:
-test byte ptr [ds:0x3a1bf+0x2a],3
+test byte ptr [ds:0x461af+0x2a],3
 jz apply_strafe
 shl eax,1
 apply_strafe:
-mov dword ptr [ds:0x1f0dd],eax
+mov dword ptr [ds:0x31441],eax
 
-and byte ptr [ds:0x3a1bf+0x11],1
-and byte ptr [ds:0x3a1bf+0x1f],1
-and byte ptr [ds:0x3a1bf+0x1e],1
-and byte ptr [ds:0x3a1bf+0x20],1
-and byte ptr [ds:0x3a1bf+0x2a],1
+and byte ptr [ds:0x461af+0x11],1
+and byte ptr [ds:0x461af+0x1f],1
+and byte ptr [ds:0x461af+0x1e],1
+and byte ptr [ds:0x461af+0x20],1
+and byte ptr [ds:0x461af+0x2a],1
 """
 
-WASD_MOD = b"\xC7\x05\x5D\xF3\x01\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xD0\xA1\x03\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xDE\xA1\x03\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xE1\xF0\x01\x00\x31\xC0\xF6\x05\xDD\xA1\x03\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xDF\xA1\x03\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xDD\xF0\x01\x00\x80\x25\xD0\xA1\x03\x00\x01\x80\x25\xDE\xA1\x03\x00\x01\x80\x25\xDD\xA1\x03\x00\x01\x80\x25\xDF\xA1\x03\x00\x01\x80\x25\xE9\xA1\x03\x00\x01"
-WASD_OFFSET = CS + 0x3839c
+WASD_MOD = b"\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x80\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x80\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
+WASD_OFFSET = CS + 0x5ae36
 # NOP until the end
-WASD_MOD += b"\x90"*(0x3851e - WASD_OFFSET - len(WASD_MOD))
+WASD_MOD += b"\x90"*(0x5afb8 - WASD_OFFSET - len(WASD_MOD))
 
 
 """
@@ -351,7 +354,7 @@ nop
 
 
 DT_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
-DT_OFFSET = 0x36460
+DT_OFFSET = 0x59b10
 
 """
 The original control scheme has LCtrl/LAlt to drop eye level, LShift to raise eye level, and 
@@ -388,40 +391,37 @@ and keyboard_state[0x2e],1
 ret
 
 [generic]
-test byte ptr [ds:0x3a1bf+0x2e],3
+test byte ptr [ds:0x461af+0x2e],3
 jz restore
 crouch:
-mov eax,dword ptr [ds:0x1f365]
-sub dword ptr [ds:0x1f260],eax
-mov eax,dword ptr [ds:0x1f260]
-cmp eax,dword ptr [ds:0x1f389]
+mov eax,dword ptr [ds:0x316bd]
+sub dword ptr [ds:0x317cc],eax
+mov eax,dword ptr [ds:0x317cc]
+cmp eax,dword ptr [ds:0x316e1]
 jge fin
-mov eax, dword ptr [ds:0x1f389]
-mov dword ptr [ds:0x1f260],eax
+mov eax, dword ptr [ds:0x316e1]
+mov dword ptr [ds:0x317cc],eax
 jmp fin
 
 restore:
-mov eax,dword ptr [ds:0x1f365]
-add dword ptr [ds:0x1f260],eax
-mov ebx,dword ptr [ds:0x1f389]
-add ebx,dword ptr [ds:0x1f264]
-mov eax,dword ptr [ds:0x1f260]
+mov eax,dword ptr [ds:0x316bd]
+add dword ptr [ds:0x317cc],eax
+mov ebx,dword ptr [ds:0x316e1]
+add ebx,dword ptr [ds:0x317d0]
+mov eax,dword ptr [ds:0x317cc]
 cmp eax,ebx
 jle fin
-mov dword ptr [ds:0x1f260],ebx
+mov dword ptr [ds:0x317cc],ebx
 
 fin:
-and byte ptr [ds:0x3a1bf+0x2e],1
+and byte ptr [ds:0x461af+0x2e],1
 ret
 
 """
 
-CROUCH_MOD = b"\xF6\x05\xED\xA1\x03\x00\x03\x74\x24\xA1\x65\xF3\x01\x00\x29\x05\x60\xF2\x01\x00\xA1\x60\xF2\x01\x00\x3B\x05\x89\xF3\x01\x00\x7D\x32\xA1\x89\xF3\x01\x00\xA3\x60\xF2\x01\x00\xEB\x26\xA1\x65\xF3\x01\x00\x01\x05\x60\xF2\x01\x00\x8B\x1D\x89\xF3\x01\x00\x03\x1D\x64\xF2\x01\x00\xA1\x60\xF2\x01\x00\x39\xD8\x7E\x06\x89\x1D\x60\xF2\x01\x00\x80\x25\xED\xA1\x03\x00\x01\xC3"
-CROUCH_OFFSET = 0x380ae
+CROUCH_MOD = b"\xF6\x05\xDD\x61\x04\x00\x03\x74\x24\xA1\xBD\x16\x03\x00\x29\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xE1\x16\x03\x00\x7D\x32\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x26\xA1\xBD\x16\x03\x00\x01\x05\xCC\x17\x03\x00\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xCC\x17\x03\x00\x39\xD8\x7E\x06\x89\x1D\xCC\x17\x03\x00\x80\x25\xDD\x61\x04\x00\x01\xC3"
+CROUCH_OFFSET = 0x5ab48
 
-
-CREDIT_MOD = b"(c) 1993.        \rMouselook v0.9 (c) 2025 moralrecordings.    \r                                "
-CREDIT_OFFSET = DS + 0x1c18d
 
 CODE_PATCHES = [
     (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
@@ -431,11 +431,10 @@ CODE_PATCHES = [
 ]
 
 DATA_PATCHES = [
-    (CREDIT_MOD, CREDIT_OFFSET)
 ]
 
 
-f = open('TEX3.EXE', 'rb').read()
+f = open('TEX4.EXE', 'rb').read()
 mz_off, le_off = search_for_le(f)
 le_header = LEHeader(f[le_off:])
 
@@ -518,7 +517,7 @@ for mod_code, mod_offset in CODE_PATCHES:
 for mod_data, mod_offset in DATA_PATCHES:
     page_data[mod_offset:mod_offset+len(mod_data)] = mod_data
 
-with open("TEX3MOD.EXE", "wb") as out:
+with open("TEX4MOD.EXE", "wb") as out:
     fixup_output = [fixups_encode(x) for x in fixup_records]
     fixup_page_table.offsets = []
     acc = 0
@@ -549,3 +548,8 @@ with open("TEX3MOD.EXE", "wb") as out:
     out.write(fixup_record_table_output)
     out.write(post_fixup_blob)
     out.write(page_data)
+
+# IDA hates the original two-stage DOS4GW embedding
+with open("TEX4MODRAW.EXE", "wb") as g:
+    f = open("TEX4MOD.EXE", "rb").read()
+    g.write(f[0x000352a4:])
