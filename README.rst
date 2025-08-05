@@ -19,6 +19,7 @@ New keyboard controls
 - **[S]** - backwards
 - **[D]** - strafe right
 - **[C]** - crouch (while held)
+- **[R]** - reach up on tippytoes (while held)
 - **[L-Shift]** - run (while held)
 
 Applying the Under a Killing Moon patch
@@ -42,3 +43,9 @@ The patch is in VCDIFF format, and requires TEX4.EXE from the GOG.com edition of
    xdelta3 -d -s tex4.exe tex4mod.vcdiff tex4mod.exe
 
 The GOG.com edition will try and run TEX4.EXE. If you want to use their bundled DOSBox to play the game, you will need to replace TEX4.EXE with the patched version, or edit ``dosboxTex4_single.conf`` to use the new EXE. The patched version is save-compatible with the original.
+
+Version history
+---------------
+
+v1.0 - 2025-08-25 - Added reach control, fixed vertical mouselook clamping
+v0.9 - 2025-07-24 - Initial release

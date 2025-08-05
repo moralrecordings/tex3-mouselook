@@ -207,21 +207,39 @@ shl eax, 17
 add movement_rot_angle, eax
 mov eax, edx
 shl eax, 1
-add movement_tilt_angle, eax
-add movement_tilt_angle_last, eax
+add eax,movement_tilt_angle_last
+cmp eax,movement_tilt_angle_top
+jge check2
+mov eax,movement_tilt_angle_top
+check2:
+cmp eax,movement_tilt_angle_bottom
+jle after
+mov eax,movement_tilt_angle_bottom
+after:
+mov movement_tilt_angle, eax
+mov movement_tilt_angle_last, eax
 ret
 
 [generic]
 mov eax, ecx
 shl eax, 17
-add ds:[0x315fd], eax
+add dword ptr ds:[0x315fd], eax
 mov eax, edx
 shl eax, 1
-add ds:[0x31605], eax 
-add ds:[0x315e8], eax 
+add eax,dword ptr ds:[0x315e8]
+cmp eax,dword ptr ds:[0x316f1]
+jge check2
+mov eax,dword ptr ds:[0x316f1]
+check2:
+cmp eax,dword ptr ds:[0x316ed]
+jle after
+mov eax,dword ptr ds:[0x316ed]
+after:
+mov dword ptr ds:[0x31605], eax 
+mov dword ptr ds:[0x315e8], eax 
 ret
 """
-MOUSELOOK_CODE = b"\x89\xC8\xC1\xE0\x11\x01\x05\xFD\x15\x03\x00\x89\xD0\xD1\xE0\x01\x05\x05\x16\x03\x00\x01\x05\xE8\x15\x03\x00\xC3"
+MOUSELOOK_CODE = b"\x89\xC8\xC1\xE0\x11\x01\x05\xFD\x15\x03\x00\x89\xD0\xD1\xE0\x03\x05\xE8\x15\x03\x00\x3B\x05\xF1\x16\x03\x00\x7D\x05\xA1\xF1\x16\x03\x00\x3B\x05\xED\x16\x03\x00\x7E\x05\xA1\xED\x16\x03\x00\xA3\x05\x16\x03\x00\xA3\xE8\x15\x03\x00\xC3"
 MOUSELOOK_OFFSET = CS + 0x59b73
 
 """
@@ -242,12 +260,12 @@ up:
 xor eax,eax
 test keyboard_state[0x11],3
 jz down
-sub eax,0x8000
+sub eax,0x4000
 
 down:
 test keyboard_state[0x1f],3
 jz leftyrighty
-add eax,0x8000
+add eax,0x4000
 
 leftyrighty:
 test keyboard_state[0x2a],3
@@ -288,12 +306,12 @@ up:
 xor eax,eax
 test byte ptr [ds:0x461af+0x11],3
 jz down
-sub eax,0x8000
+sub eax,0x4000
 
 down:
 test byte ptr [ds:0x461af+0x1f],3
 jz leftyrighty
-add eax,0x8000
+add eax,0x4000
 
 leftyrighty:
 test byte ptr [ds:0x461af+0x2a],3
@@ -327,7 +345,7 @@ and byte ptr [ds:0x461af+0x20],1
 and byte ptr [ds:0x461af+0x2a],1
 """
 
-WASD_MOD = b"\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x80\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x80\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
+WASD_MOD = b"\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
 WASD_OFFSET = CS + 0x5ae36
 # NOP until the end
 WASD_MOD += b"\x90"*(0x5afb8 - WASD_OFFSET - len(WASD_MOD))
@@ -357,14 +375,37 @@ DT_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
 DT_OFFSET = 0x59b10
 
 """
+The game normally maps "run" to the R key, but we're using it now, so nop out that code.
+"""
+
+RKEY_MOD = b"\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90"
+RKEY_OFFSET = 0x5b0cb
+
+
+"""
 The original control scheme has LCtrl/LAlt to drop eye level, LShift to raise eye level, and 
-E to restore to normal eye level. Let's simplify this to crouching while holding C, else restore
+E to restore to normal eye level. Let's simplify this to crouching while holding C, or reach up on tippytoes while holding R, else restore
 to normal eye level.
 
+C (keycode 0x2e)
+R (keycode 0x13)
 
 [pseudo]
 test keyboard_state[0x2e],3
+jnz crouch 
+test keyboard_state[0x13],3
 jz restore
+
+tippytoes:
+mov eax,movement_eye_level_incr
+add movement_eye_level,eax
+mov eax,movement_eye_level
+cmp eax,movement_eye_level_max
+jle fin
+mov eax, movement_eye_level_max
+mov movement_eye_level,eax
+jmp fin
+
 crouch:
 mov eax,movement_eye_level_incr
 sub movement_eye_level,eax
@@ -375,26 +416,66 @@ mov eax, movement_eye_level_min
 mov movement_eye_level,eax
 jmp fin
 
+
+; if incr > abs(eye level - neutral), eye level = neutral, end
 restore:
-mov eax,movement_eye_level_incr
-add movement_eye_level,eax
 mov ebx,movement_eye_level_min
 add ebx,movement_eye_level_restore
 mov eax,movement_eye_level
-cmp eax,ebx
-jle fin
+sub eax,ebx
+push edx
+cdq
+xor eax, edx
+sub eax, edx
+pop edx
+cmp eax,movement_eye_level_incr
+jle skip
+
+; if eye level > neutral, incr is negative, else positive
+mov ebx,movement_eye_level_min
+add ebx,movement_eye_level_restore
+mov eax,movement_eye_level_incr
+cmp ebx,movement_eye_level
+jg adjust
+neg eax
+
+; eye level += incr
+adjust:
+add movement_eye_level,eax
+jmp fin
+
+skip:
+mov ebx,movement_eye_level_min
+add ebx,movement_eye_level_restore
 mov movement_eye_level,ebx
 
 fin:
 and keyboard_state[0x2e],1
+and keyboard_state[0x13],1
 
 ret
 
+
+
 [generic]
 test byte ptr [ds:0x461af+0x2e],3
-jz restore
+jnz crouch
+test byte ptr [ds:0x461af+0x13],3
+jz restore 
+
+tippytoes:
+mov eax,dword ptr [ds:0x316BD]
+add dword ptr [ds:0x317cc],eax
+mov eax,dword ptr [ds:0x317cc]
+cmp eax,dword ptr [ds:0x316dd]
+jle fin
+mov eax, dword ptr [ds:0x316dd]
+mov dword ptr [ds:0x317cc],eax
+jmp fin
+
+
 crouch:
-mov eax,dword ptr [ds:0x316bd]
+mov eax,dword ptr [ds:0x316BD]
 sub dword ptr [ds:0x317cc],eax
 mov eax,dword ptr [ds:0x317cc]
 cmp eax,dword ptr [ds:0x316e1]
@@ -404,22 +485,43 @@ mov dword ptr [ds:0x317cc],eax
 jmp fin
 
 restore:
-mov eax,dword ptr [ds:0x316bd]
-add dword ptr [ds:0x317cc],eax
 mov ebx,dword ptr [ds:0x316e1]
 add ebx,dword ptr [ds:0x317d0]
 mov eax,dword ptr [ds:0x317cc]
-cmp eax,ebx
-jle fin
+sub eax,ebx
+push edx
+cdq
+xor eax, edx
+sub eax, edx 
+pop edx
+cmp eax,dword ptr [ds:0x316BD]
+jle skip
+
+mov ebx,dword ptr [ds:0x316e1]
+add ebx,dword ptr [ds:0x317d0]
+mov eax,dword ptr [ds:0x316BD]
+cmp ebx,dword ptr [ds:0x317cc]
+jg adjust
+neg eax
+
+adjust:
+add dword ptr [ds:0x317cc],eax
+jmp fin
+
+skip:
+mov ebx,dword ptr [ds:0x316e1]
+add ebx,dword ptr [ds:0x317d0]
 mov dword ptr [ds:0x317cc],ebx
 
 fin:
 and byte ptr [ds:0x461af+0x2e],1
+and byte ptr [ds:0x461af+0x13],1
 ret
+
 
 """
 
-CROUCH_MOD = b"\xF6\x05\xDD\x61\x04\x00\x03\x74\x24\xA1\xBD\x16\x03\x00\x29\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xE1\x16\x03\x00\x7D\x32\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x26\xA1\xBD\x16\x03\x00\x01\x05\xCC\x17\x03\x00\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xCC\x17\x03\x00\x39\xD8\x7E\x06\x89\x1D\xCC\x17\x03\x00\x80\x25\xDD\x61\x04\x00\x01\xC3"
+CROUCH_MOD = b"\xF6\x05\xDD\x61\x04\x00\x03\x75\x31\xF6\x05\xC2\x61\x04\x00\x03\x74\x4C\xA1\xBD\x16\x03\x00\x01\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xDD\x16\x03\x00\x0F\x8E\x87\x00\x00\x00\xA1\xDD\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x7B\xA1\xBD\x16\x03\x00\x29\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xE1\x16\x03\x00\x7D\x63\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x57\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xCC\x17\x03\x00\x29\xD8\x52\x99\x31\xD0\x29\xD0\x5A\x3B\x05\xBD\x16\x03\x00\x7E\x23\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xBD\x16\x03\x00\x3B\x1D\xCC\x17\x03\x00\x7F\x02\xF7\xD8\x01\x05\xCC\x17\x03\x00\xEB\x12\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\x89\x1D\xCC\x17\x03\x00\x80\x25\xDD\x61\x04\x00\x01\x80\x25\xC2\x61\x04\x00\x01\xC3"
 CROUCH_OFFSET = 0x5ab48
 
 
@@ -427,6 +529,7 @@ CODE_PATCHES = [
     (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
     (WASD_MOD, WASD_OFFSET),
     (DT_MOD, DT_OFFSET),
+    (RKEY_MOD, RKEY_OFFSET),
     (CROUCH_MOD, CROUCH_OFFSET),
 ]
 
@@ -489,12 +592,12 @@ for mod_code, mod_offset in CODE_PATCHES:
                   iced_x86.Code.CMP_R32_RM32 |
                   iced_x86.Code.MOV_R32_RM32 |
                   iced_x86.Code.ADD_R32_RM32 |
-                  iced_x86.Code.SUB_RM32_R32 |
                   iced_x86.Code.AND_RM8_IMM8):
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
-            case iced_x86.Code.MOV_RM32_R32:
+            case (iced_x86.Code.MOV_RM32_R32 |
+                  iced_x86.Code.SUB_RM32_R32):
                 # this bastard can have both memory and registers as a source operand
                 if instr.memory_displacement:
                     fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+2, utils.from_uint32_le(mod_code[instr.ip+2:instr.ip+6]))
