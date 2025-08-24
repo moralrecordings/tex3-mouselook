@@ -184,10 +184,10 @@ CODE_OBJ = 0
 DATA_OBJ = 2
 
 # converting offsets inside mame
-# to_ds = lambda x: hex(x+0x342000)
-# from_ds = lambda x: hex(x-0x342000)
-# to_cs = lambda x: hex(x+0x35f000)
-# from_cs = lambda x: hex(x-0x35f000)
+# to_ds = lambda x: hex(x+0x398000)
+# from_ds = lambda x: hex(x-0x398000)
+# to_cs = lambda x: hex(x+0x3b7000)
+# from_cs = lambda x: hex(x-0x3b7000)
 
 """
 The game keeps track of the mouse in two ways; as a clamped (x, y) position in screen coordinates,
@@ -254,6 +254,8 @@ D (keycode 0x20)
 LShift (keycode 0x2a)
 
 [pseudo]
+cmp using_alien_abductor, 0
+jne skip
 mov movement_strafe,1
 
 up:
@@ -297,9 +299,11 @@ and keyboard_state[0x1f],1
 and keyboard_state[0x1e],1
 and keyboard_state[0x20],1
 and keyboard_state[0x2a],1
-
+skip:
 
 [generic]
+cmp byte ptr [ds:0x3e949], 0
+jne skip
 mov dword ptr [ds:0x316b5],1
 
 up:
@@ -343,9 +347,10 @@ and byte ptr [ds:0x461af+0x1f],1
 and byte ptr [ds:0x461af+0x1e],1
 and byte ptr [ds:0x461af+0x20],1
 and byte ptr [ds:0x461af+0x2a],1
+skip:
 """
 
-WASD_MOD = b"\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
+WASD_MOD = b"\x80\x3D\x49\xE9\x03\x00\x00\x0F\x85\x89\x00\x00\x00\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
 WASD_OFFSET = CS + 0x5ae36
 # NOP until the end
 WASD_MOD += b"\x90"*(0x5afb8 - WASD_OFFSET - len(WASD_MOD))
@@ -391,6 +396,15 @@ C (keycode 0x2e)
 R (keycode 0x13)
 
 [pseudo]
+cmp using_alien_abductor, 0
+je start
+ret
+start:
+push ecx
+push edx
+mov ecx,movement_eye_level_min
+add ecx,movement_eye_level_restore
+
 test keyboard_state[0x2e],3
 jnz crouch 
 test keyboard_state[0x13],3
@@ -419,23 +433,17 @@ jmp fin
 
 ; if incr > abs(eye level - neutral), eye level = neutral, end
 restore:
-mov ebx,movement_eye_level_min
-add ebx,movement_eye_level_restore
 mov eax,movement_eye_level
-sub eax,ebx
-push edx
+sub eax,ecx
 cdq
 xor eax, edx
 sub eax, edx
-pop edx
 cmp eax,movement_eye_level_incr
 jle skip
 
 ; if eye level > neutral, incr is negative, else positive
-mov ebx,movement_eye_level_min
-add ebx,movement_eye_level_restore
 mov eax,movement_eye_level_incr
-cmp ebx,movement_eye_level
+cmp ecx,movement_eye_level
 jg adjust
 neg eax
 
@@ -445,19 +453,27 @@ add movement_eye_level,eax
 jmp fin
 
 skip:
-mov ebx,movement_eye_level_min
-add ebx,movement_eye_level_restore
-mov movement_eye_level,ebx
+mov movement_eye_level,ecx
 
 fin:
 and keyboard_state[0x2e],1
 and keyboard_state[0x13],1
-
+pop edx
+pop ecx
 ret
 
 
 
 [generic]
+cmp byte ptr [ds:0x3e949], 0
+je start
+ret
+start:
+push ecx
+push edx
+mov ecx,dword ptr [ds:0x316e1]
+add ecx,dword ptr [ds:0x317d0]
+
 test byte ptr [ds:0x461af+0x2e],3
 jnz crouch
 test byte ptr [ds:0x461af+0x13],3
@@ -485,22 +501,16 @@ mov dword ptr [ds:0x317cc],eax
 jmp fin
 
 restore:
-mov ebx,dword ptr [ds:0x316e1]
-add ebx,dword ptr [ds:0x317d0]
 mov eax,dword ptr [ds:0x317cc]
-sub eax,ebx
-push edx
+sub eax,ecx
 cdq
 xor eax, edx
 sub eax, edx 
-pop edx
 cmp eax,dword ptr [ds:0x316BD]
 jle skip
 
-mov ebx,dword ptr [ds:0x316e1]
-add ebx,dword ptr [ds:0x317d0]
 mov eax,dword ptr [ds:0x316BD]
-cmp ebx,dword ptr [ds:0x317cc]
+cmp ecx,dword ptr [ds:0x317cc]
 jg adjust
 neg eax
 
@@ -509,21 +519,184 @@ add dword ptr [ds:0x317cc],eax
 jmp fin
 
 skip:
-mov ebx,dword ptr [ds:0x316e1]
-add ebx,dword ptr [ds:0x317d0]
-mov dword ptr [ds:0x317cc],ebx
+mov dword ptr [ds:0x317cc],ecx
 
 fin:
 and byte ptr [ds:0x461af+0x2e],1
 and byte ptr [ds:0x461af+0x13],1
+pop edx
+pop ecx
 ret
 
 
 """
 
-CROUCH_MOD = b"\xF6\x05\xDD\x61\x04\x00\x03\x75\x31\xF6\x05\xC2\x61\x04\x00\x03\x74\x4C\xA1\xBD\x16\x03\x00\x01\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xDD\x16\x03\x00\x0F\x8E\x87\x00\x00\x00\xA1\xDD\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x7B\xA1\xBD\x16\x03\x00\x29\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xE1\x16\x03\x00\x7D\x63\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x57\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xCC\x17\x03\x00\x29\xD8\x52\x99\x31\xD0\x29\xD0\x5A\x3B\x05\xBD\x16\x03\x00\x7E\x23\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\xA1\xBD\x16\x03\x00\x3B\x1D\xCC\x17\x03\x00\x7F\x02\xF7\xD8\x01\x05\xCC\x17\x03\x00\xEB\x12\x8B\x1D\xE1\x16\x03\x00\x03\x1D\xD0\x17\x03\x00\x89\x1D\xCC\x17\x03\x00\x80\x25\xDD\x61\x04\x00\x01\x80\x25\xC2\x61\x04\x00\x01\xC3"
+CROUCH_MOD = b"\x80\x3D\x49\xE9\x03\x00\x00\x74\x01\xC3\x51\x52\x8B\x0D\xE1\x16\x03\x00\x03\x0D\xD0\x17\x03\x00\xF6\x05\xDD\x61\x04\x00\x03\x75\x2D\xF6\x05\xC2\x61\x04\x00\x03\x74\x48\xA1\xBD\x16\x03\x00\x01\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xDD\x16\x03\x00\x7E\x63\xA1\xDD\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x57\xA1\xBD\x16\x03\x00\x29\x05\xCC\x17\x03\x00\xA1\xCC\x17\x03\x00\x3B\x05\xE1\x16\x03\x00\x7D\x3F\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xEB\x33\xA1\xCC\x17\x03\x00\x29\xC8\x52\x99\x31\xD0\x29\xD0\x5A\x3B\x05\xBD\x16\x03\x00\x7E\x17\xA1\xBD\x16\x03\x00\x3B\x0D\xCC\x17\x03\x00\x7F\x02\xF7\xD8\x01\x05\xCC\x17\x03\x00\xEB\x06\x89\x0D\xCC\x17\x03\x00\x80\x25\xDD\x61\x04\x00\x01\x80\x25\xC2\x61\x04\x00\x01\x5A\x59\xC3"
 CROUCH_OFFSET = 0x5ab48
 
+"""
+A new feature in Pandora Directive is the Alien Abductor remote control vehicle. 
+You won't be surprised to learn that this is basically the same engine as the walking,
+only you click on a d-pad instead of adjusting speed with the mouse.
+
+The original code tries to be clever and smoothly ramp the velocity up and down, however
+this acceleration is coupled to framerate instead of timer ticks, and runs much too fast 
+on modern hardware.
+
+The original code is sprawling and repeats itself a lot, so it's easier to just write a new one.
+
+[pseudo]
+cmp fake_key_input, 0x2a
+jne hoverdown
+mov eax, movement_eye_level
+add eax, 0x400
+cmp eax, movement_eye_level_max
+jl hoverup_write
+mov eax, movement_eye_level_max
+hoverup_write:
+mov movement_eye_level, eax
+
+hoverdown:
+cmp fake_key_input, 0x38
+jne dpad
+mov eax, movement_eye_level
+sub eax, 0x400
+cmp eax, movement_eye_level_min
+jg hoverdown_write
+mov eax, movement_eye_level_min
+hoverdown_write:
+mov movement_eye_level, eax
+
+dpad:
+mov al, abductor_state
+cmp al, 2
+je move
+
+mov movement_rot_veloc_world, 0
+mov movement_fwd_veloc_world, 0
+jmp fin
+
+move:
+test abductor_dpad, 0xc
+jz updown
+turn:
+mov eax, 0x400000
+test abductor_dpad, 0x8
+jnz leftright_speed
+neg eax
+leftright_speed:
+test keyboard_state[0x2a],3
+jz leftright_apply
+shl eax,1
+leftright_apply:
+mov movement_rot_veloc_world, eax 
+
+updown:
+test abductor_dpad, 0x3
+jz fin
+mov eax, 0x1800
+test abductor_dpad, 0x2
+jnz updown_speed
+neg eax
+updown_speed:
+test keyboard_state[0x2a],3
+jz updown_apply
+shl eax,1
+updown_apply:
+mov movement_fwd_veloc_world, eax
+
+fin:
+mov mouse_unbounded_x_mod, 0
+mov mouse_unbounded_y_mod, 0
+and byte ptr keyboard_state[0x2a],1
+ret
+
+
+
+[generic]
+cmp byte ptr [ds:0x3e914], 0x2a
+jne hoverdown
+mov eax, dword ptr [ds:0x317cc]
+add eax, 0x400
+cmp eax, dword ptr [ds:0x316dd]
+jl hoverup_write
+mov eax, dword ptr [ds:0x316dd]
+hoverup_write:
+mov dword ptr [ds:0x317cc], eax
+
+hoverdown:
+cmp  byte ptr [ds:0x3e914], 0x38
+jne dpad
+mov eax, dword ptr [ds:0x317cc]
+sub eax, 0x400
+cmp eax, dword ptr [ds:0x316e1]
+jg hoverdown_write
+mov eax, dword ptr [ds:0x316e1]
+hoverdown_write:
+mov dword ptr [ds:0x317cc], eax
+
+
+dpad:
+mov al, byte ptr [ds:0x3e945]
+cmp al, 2
+je move
+
+mov dword ptr [ds:0x31441], 0
+mov dword ptr [ds:0x31445], 0
+jmp fin
+
+move:
+test byte ptr [ds:0x3e946], 0xc
+jz updown
+turn:
+mov eax, 0x400000
+test byte ptr [ds:0x3e946], 0x8
+jnz leftright_speed
+neg eax
+leftright_speed:
+test byte ptr [ds:0x461af+0x2a],3
+jz leftright_apply
+shl eax,1
+leftright_apply:
+mov dword ptr [ds:0x31441], eax 
+
+updown:
+test byte ptr [ds:0x3e946], 0x3
+jz fin
+mov eax, 0x1800
+test byte ptr [ds:0x3e946], 0x2
+jnz updown_speed
+neg eax
+updown_speed:
+test byte ptr [ds:0x461af+0x2a],3
+jz updown_apply
+shl eax,1
+updown_apply:
+mov dword ptr [ds:0x31445], eax
+
+fin:
+mov word ptr [ds:0x2018a], 0
+mov word ptr [ds:0x2018c], 0
+and byte ptr [ds:0x461af+0x2a],1
+ret
+
+"""
+
+ABDUCTOR_MOD = b"\x80\x3D\x14\xE9\x03\x00\x2A\x75\x1C\xA1\xCC\x17\x03\x00\x05\x00\x04\x00\x00\x3B\x05\xDD\x16\x03\x00\x7C\x05\xA1\xDD\x16\x03\x00\xA3\xCC\x17\x03\x00\x80\x3D\x14\xE9\x03\x00\x38\x75\x1C\xA1\xCC\x17\x03\x00\x2D\x00\x04\x00\x00\x3B\x05\xE1\x16\x03\x00\x7F\x05\xA1\xE1\x16\x03\x00\xA3\xCC\x17\x03\x00\xA0\x45\xE9\x03\x00\x3C\x02\x74\x16\xC7\x05\x41\x14\x03\x00\x00\x00\x00\x00\xC7\x05\x45\x14\x03\x00\x00\x00\x00\x00\xEB\x52\xF6\x05\x46\xE9\x03\x00\x0C\x74\x20\xB8\x00\x00\x40\x00\xF6\x05\x46\xE9\x03\x00\x08\x75\x02\xF7\xD8\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\xF6\x05\x46\xE9\x03\x00\x03\x74\x20\xB8\x00\x18\x00\x00\xF6\x05\x46\xE9\x03\x00\x02\x75\x02\xF7\xD8\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x66\xC7\x05\x8A\x01\x02\x00\x00\x00\x66\xC7\x05\x8C\x01\x02\x00\x00\x00\x80\x25\xD9\x61\x04\x00\x01\xC3"
+ABDUCTOR_OFFSET = 0x80
+
+"""
+Another bit of the alien abductor code injects keyboard presses for the hover up/hover down buttons.
+This is bad news, as it relies on the original eye level code that we threw out.
+So here we nop out the injection part.
+"""
+
+ABDUCTOR_HOVERUP_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
+ABDUCTOR_HOVERUP_OFFSET = 0x2a57
+
+
+ABDUCTOR_HOVERDOWN_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
+ABDUCTOR_HOVERDOWN_OFFSET = 0x2902
 
 CODE_PATCHES = [
     (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
@@ -531,6 +704,9 @@ CODE_PATCHES = [
     (DT_MOD, DT_OFFSET),
     (RKEY_MOD, RKEY_OFFSET),
     (CROUCH_MOD, CROUCH_OFFSET),
+    (ABDUCTOR_MOD, ABDUCTOR_OFFSET),
+    (ABDUCTOR_HOVERUP_MOD, ABDUCTOR_HOVERUP_OFFSET),
+    (ABDUCTOR_HOVERDOWN_MOD, ABDUCTOR_HOVERDOWN_OFFSET),
 ]
 
 DATA_PATCHES = [
@@ -590,6 +766,7 @@ for mod_code, mod_offset in CODE_PATCHES:
                   iced_x86.Code.AND_R8_RM8 |
                   iced_x86.Code.TEST_RM8_IMM8 |
                   iced_x86.Code.CMP_R32_RM32 |
+                  iced_x86.Code.CMP_RM8_IMM8 |
                   iced_x86.Code.MOV_R32_RM32 |
                   iced_x86.Code.ADD_R32_RM32 |
                   iced_x86.Code.AND_RM8_IMM8):
@@ -609,11 +786,14 @@ for mod_code, mod_offset in CODE_PATCHES:
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+1, utils.from_uint32_le(mod_code[instr.ip+1:instr.ip+5]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
+            case (iced_x86.Code.MOV_RM16_IMM16):
+                fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+3, utils.from_uint32_le(mod_code[instr.ip+3:instr.ip+7]))
+                print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
             case (iced_x86.Code.JMP_RM32):
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, CODE_OBJ, srcoff+3, utils.from_uint32_le(mod_code[instr.ip+3:instr.ip+7]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
-
 
     page_data[mod_offset:mod_offset+len(mod_code)] = mod_code
 
