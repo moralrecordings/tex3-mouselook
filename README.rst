@@ -11,6 +11,9 @@ As it happens, the sequel The Pandora Directive uses near identical movement cod
 
 To apply the patches, you will need the `Xdelta patching tool <https://github.com/jmacd/xdelta-gpl/releases/tag/v3.1.0>`_. Windows users who are after a GUI tool might have luck with `Xdelta UI <https://www.romhacking.net/utilities/598>`_.
 
+You can download the latest version of the patch files from the `tags page <https://github.com/moralrecordings/tex3-mouselook/tags>`_.
+
+
 New keyboard controls 
 ---------------------
 - **Mouse** - Look around
@@ -29,7 +32,7 @@ The patch is in VCDIFF format, and requires TEX3.EXE from the GOG.com edition of
 
 .. code:: bash
 
-   xdelta3 -d -s tex3.exe tex3mod.vcdiff tex3mod.exe
+   xdelta3 -d -s tex3.exe tex3mod.xdelta tex3mod.exe
 
 As of July 2025, the GOG.com edition will try and run TEX197.EXE. If you want to use their bundled DOSBox to play the game, you will still need to build the patch using TEX3.EXE, but instead replace TEX197.EXE with the patched version, or edit ``dosboxTex3_single.conf`` to use the new EXE. The patched version is save-compatible with the original.
 
@@ -40,12 +43,13 @@ The patch is in VCDIFF format, and requires TEX4.EXE from the GOG.com edition of
 
 .. code:: bash
 
-   xdelta3 -d -s tex4.exe tex4mod.vcdiff tex4mod.exe
+   xdelta3 -d -s tex4.exe tex4mod.xdelta tex4mod.exe
 
 The GOG.com edition will try and run TEX4.EXE. If you want to use their bundled DOSBox to play the game, you will need to replace TEX4.EXE with the patched version, or edit ``dosboxTex4_single.conf`` to use the new EXE. The patched version is save-compatible with the original.
 
 Version history
 ---------------
 
-v1.0 - 2025-08-25 - Added reach control, fixed vertical mouselook clamping
-v0.9 - 2025-07-24 - Initial release
+- v1.1 - 2025-08-24 - Improved screen flickering, fixed Alien Abductor in tex4
+- v1.0 - 2025-08-05 - Added reach control, fixed vertical mouselook clamping
+- v0.9 - 2025-07-24 - Initial release

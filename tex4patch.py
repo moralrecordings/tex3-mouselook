@@ -301,6 +301,7 @@ and keyboard_state[0x20],1
 and keyboard_state[0x2a],1
 skip:
 
+
 [generic]
 cmp byte ptr [ds:0x3e949], 0
 jne skip
@@ -351,10 +352,14 @@ skip:
 """
 
 WASD_MOD = b"\x80\x3D\x49\xE9\x03\x00\x00\x0F\x85\x89\x00\x00\x00\xC7\x05\xB5\x16\x03\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xC0\x61\x04\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xCE\x61\x04\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x45\x14\x03\x00\x31\xC0\xF6\x05\xCD\x61\x04\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xCF\x61\x04\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xD9\x61\x04\x00\x03\x74\x02\xD1\xE0\xA3\x41\x14\x03\x00\x80\x25\xC0\x61\x04\x00\x01\x80\x25\xCE\x61\x04\x00\x01\x80\x25\xCD\x61\x04\x00\x01\x80\x25\xCF\x61\x04\x00\x01\x80\x25\xD9\x61\x04\x00\x01"
-WASD_OFFSET = CS + 0x5ae36
-# NOP until the end
-WASD_MOD += b"\x90"*(0x5afb8 - WASD_OFFSET - len(WASD_MOD))
+WASD_OFFSET = 0x5ae36
+WASD_REJOIN = 0x5afb8
 
+# calculate relative jump to next bit of code
+WASD_MOD += b"\xE9" + utils.to_int32_le(WASD_REJOIN - (WASD_OFFSET + len(WASD_MOD)) - 5)
+WASD_MOD_END = len(WASD_MOD) + WASD_OFFSET
+# fill gap with nops
+WASD_MOD += b"\x90" * (WASD_REJOIN - WASD_MOD_END)
 
 """
 The game engine measures the number of ticks between redraws, and multiplies this delta time value 
@@ -694,9 +699,54 @@ So here we nop out the injection part.
 ABDUCTOR_HOVERUP_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
 ABDUCTOR_HOVERUP_OFFSET = 0x2a57
 
-
 ABDUCTOR_HOVERDOWN_MOD = b"\x90\x90\x90\x90\x90\x90\x90"
 ABDUCTOR_HOVERDOWN_OFFSET = 0x2902
+
+"""
+Tex Murphy does not have any code in the 3D engine to wait for vsync.
+This isn't an issue on a 486 running at <5fps, but on DOSBox you get a nice
+distracting screen flicker in interactive mode from all of the screen tearing.
+
+To solve this, we shim the start of the function that draws frames in interactive
+mode, and have it jump to some new code which calls the VBE 2.0 Set Display Start
+method to wait for the vertical retrace to happen.
+This won't remove flicker entirely, as the engine is not double-buffered, but it's
+a big improvement over doing nothing.
+
+We have a bunch of space left over from WASD_MOD, so shove it in there.
+"""
+VSYNC_JMP_OFFSET = 0x5a314 # interactive_draw_frame
+VSYNC_JMP_MOD = b"\xe9" + utils.to_int32_le(WASD_MOD_END - VSYNC_JMP_OFFSET - 5)
+
+VSYNC_RETURN_OFFSET = 0x5a31f
+
+"""
+Vsync shim.
+
+[generic]
+push eax
+push ebx
+push ecx
+push edx
+mov ax, 0x4f07
+mov bx, 0x0080
+mov cx, 0x0000
+mov dx, 0x0000
+int 0x10
+pop edx
+pop ecx
+pop ebx
+pop eax
+
+push es
+pusha
+mov word ptr [ds:0x31538], 0
+
+"""
+VSYNC_OFFSET = WASD_MOD_END
+VSYNC_MOD = b"\x50\x53\x51\x52\x66\xB8\x07\x4F\x66\xBB\x80\x00\x66\xB9\x00\x00\x66\xBA\x00\x00\xCD\x10\x5A\x59\x5B\x58\x06\x60\x66\xC7\x05\x38\x15\x03\x00\x00\x00"
+VSYNC_MOD += b"\xe9" + utils.to_int32_le(VSYNC_RETURN_OFFSET - len(VSYNC_MOD) - WASD_MOD_END - 5)
+
 
 CODE_PATCHES = [
     (MOUSELOOK_CODE, MOUSELOOK_OFFSET),
@@ -707,6 +757,8 @@ CODE_PATCHES = [
     (ABDUCTOR_MOD, ABDUCTOR_OFFSET),
     (ABDUCTOR_HOVERUP_MOD, ABDUCTOR_HOVERUP_OFFSET),
     (ABDUCTOR_HOVERDOWN_MOD, ABDUCTOR_HOVERDOWN_OFFSET),
+    (VSYNC_JMP_MOD, VSYNC_JMP_OFFSET),
+    (VSYNC_MOD, VSYNC_OFFSET),
 ]
 
 DATA_PATCHES = [
@@ -767,6 +819,7 @@ for mod_code, mod_offset in CODE_PATCHES:
                   iced_x86.Code.TEST_RM8_IMM8 |
                   iced_x86.Code.CMP_R32_RM32 |
                   iced_x86.Code.CMP_RM8_IMM8 |
+                  iced_x86.Code.MOV_R8_RM8 |
                   iced_x86.Code.MOV_R32_RM32 |
                   iced_x86.Code.ADD_R32_RM32 |
                   iced_x86.Code.AND_RM8_IMM8):

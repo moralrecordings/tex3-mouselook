@@ -343,9 +343,14 @@ and byte ptr [ds:0x3a1bf+0x2a],1
 """
 
 WASD_MOD = b"\xC7\x05\x5D\xF3\x01\x00\x01\x00\x00\x00\x31\xC0\xF6\x05\xD0\xA1\x03\x00\x03\x74\x05\x2D\x00\x40\x00\x00\xF6\x05\xDE\xA1\x03\x00\x03\x74\x05\x05\x00\x40\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xE1\xF0\x01\x00\x31\xC0\xF6\x05\xDD\xA1\x03\x00\x03\x74\x05\x2D\x00\xC0\x00\x00\xF6\x05\xDF\xA1\x03\x00\x03\x74\x05\x05\x00\xC0\x00\x00\xF6\x05\xE9\xA1\x03\x00\x03\x74\x02\xD1\xE0\xA3\xDD\xF0\x01\x00\x80\x25\xD0\xA1\x03\x00\x01\x80\x25\xDE\xA1\x03\x00\x01\x80\x25\xDD\xA1\x03\x00\x01\x80\x25\xDF\xA1\x03\x00\x01\x80\x25\xE9\xA1\x03\x00\x01"
-WASD_OFFSET = CS + 0x3839c
-# NOP until the end
-WASD_MOD += b"\x90"*(0x3851e - WASD_OFFSET - len(WASD_MOD))
+WASD_OFFSET = 0x3839c
+WASD_REJOIN = 0x3851e
+
+# calculate relative jump to next bit of code
+WASD_MOD += b"\xE9" + utils.to_int32_le(WASD_REJOIN - (WASD_OFFSET + len(WASD_MOD)) - 5)
+WASD_MOD_END = len(WASD_MOD) + WASD_OFFSET
+# fill gap with nops
+WASD_MOD += b"\x90" * (WASD_REJOIN - WASD_MOD_END)
 
 
 """
@@ -519,8 +524,52 @@ ret
 CROUCH_MOD = b"\xF6\x05\xED\xA1\x03\x00\x03\x75\x31\xF6\x05\xD2\xA1\x03\x00\x03\x74\x4C\xA1\x65\xF3\x01\x00\x01\x05\x60\xF2\x01\x00\xA1\x60\xF2\x01\x00\x3B\x05\x85\xF3\x01\x00\x0F\x8E\x87\x00\x00\x00\xA1\x85\xF3\x01\x00\xA3\x60\xF2\x01\x00\xEB\x7B\xA1\x65\xF3\x01\x00\x29\x05\x60\xF2\x01\x00\xA1\x60\xF2\x01\x00\x3B\x05\x89\xF3\x01\x00\x7D\x63\xA1\x89\xF3\x01\x00\xA3\x60\xF2\x01\x00\xEB\x57\x8B\x1D\x89\xF3\x01\x00\x03\x1D\x64\xF2\x01\x00\xA1\x60\xF2\x01\x00\x29\xD8\x52\x99\x31\xD0\x29\xD0\x5A\x3B\x05\x65\xF3\x01\x00\x7E\x23\x8B\x1D\x89\xF3\x01\x00\x03\x1D\x64\xF2\x01\x00\xA1\x65\xF3\x01\x00\x3B\x1D\x60\xF2\x01\x00\x7F\x02\xF7\xD8\x01\x05\x60\xF2\x01\x00\xEB\x12\x8B\x1D\x89\xF3\x01\x00\x03\x1D\x64\xF2\x01\x00\x89\x1D\x60\xF2\x01\x00\x80\x25\xED\xA1\x03\x00\x01\x80\x25\xD2\xA1\x03\x00\x01\xC3"
 CROUCH_OFFSET = 0x380ae
 
+"""
+Tex Murphy does not have any code in the 3D engine to wait for vsync.
+This isn't an issue on a 486 running at <5fps, but on DOSBox you get a nice
+distracting screen flicker in interactive mode from all of the screen tearing.
 
-CREDIT_MOD = b"(c) 1993.        \rMouselook v1.0 (c) 2025 moralrecordings.    \r                                "
+To solve this, we shim the start of the function that draws frames in interactive
+mode, and have it jump to some new code which calls the VBE 2.0 Set Display Start
+method to wait for the vertical retrace to happen.
+This won't remove flicker entirely, as the engine is not double-buffered, but it's
+a big improvement over doing nothing.
+
+We have a bunch of space left over from WASD_MOD, so shove it in there.
+"""
+VSYNC_JMP_OFFSET = 0x2a96b
+VSYNC_JMP_MOD = b"\xE8" + utils.to_int32_le(WASD_MOD_END - VSYNC_JMP_OFFSET - 5)
+
+"""
+Vsync shim.
+
+[generic]
+push eax
+push ebx
+push ecx
+push edx
+mov ax, 0x4f07
+mov bx, 0x0080
+mov cx, 0x0000
+mov dx, 0x0000
+int 0x10
+pop edx
+pop ecx
+pop ebx
+pop eax
+
+
+"""
+DRAWFRAME_OFFSET = 0x2e28d
+VSYNC_OFFSET = WASD_MOD_END
+VSYNC_MOD = b"\x50\x53\x51\x52\x66\xB8\x07\x4F\x66\xBB\x80\x00\x66\xB9\x00\x00\x66\xBA\x00\x00\xCD\x10\x5A\x59\x5B\x58"
+VSYNC_MOD += b"\xe9" + utils.to_int32_le(DRAWFRAME_OFFSET - len(VSYNC_MOD) - WASD_MOD_END - 5)
+
+
+
+
+
+CREDIT_MOD = b"(c) 1993.        \rMouselook v1.1 (c) 2025 moralrecordings.    \r                                "
 CREDIT_OFFSET = DS + 0x1c18d
 
 CODE_PATCHES = [
@@ -529,6 +578,8 @@ CODE_PATCHES = [
     (DT_MOD, DT_OFFSET),
     (RKEY_MOD, RKEY_OFFSET),
     (CROUCH_MOD, CROUCH_OFFSET),
+    (VSYNC_JMP_MOD, VSYNC_JMP_OFFSET),
+    (VSYNC_MOD, VSYNC_OFFSET),
 ]
 
 DATA_PATCHES = [
@@ -589,6 +640,7 @@ for mod_code, mod_offset in CODE_PATCHES:
                   iced_x86.Code.AND_R8_RM8 |
                   iced_x86.Code.TEST_RM8_IMM8 |
                   iced_x86.Code.CMP_R32_RM32 |
+                  iced_x86.Code.MOV_R8_RM8 |
                   iced_x86.Code.MOV_R32_RM32 |
                   iced_x86.Code.ADD_R32_RM32 |
                   iced_x86.Code.AND_RM8_IMM8):
@@ -606,6 +658,10 @@ for mod_code, mod_offset in CODE_PATCHES:
                   iced_x86.Code.MOV_MOFFS32_EAX |
                   iced_x86.Code.MOV_EAX_MOFFS32):
                 fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+1, utils.from_uint32_le(mod_code[instr.ip+1:instr.ip+5]))
+                print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
+            case (iced_x86.Code.MOV_RM16_IMM16):
+                fixup = FixupTuple("fix_32off_32", 0x7, 0x10, DATA_OBJ, srcoff+3, utils.from_uint32_le(mod_code[instr.ip+3:instr.ip+7]))
                 print((page, None, hex(offset), fixup))
                 fixup_records[page].append(fixup)
             case (iced_x86.Code.JMP_RM32):
