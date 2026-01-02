@@ -1252,9 +1252,14 @@ So here we nop out the injection part.
             CODE_PATCHES.append((abductor_hoverdown_instrs, abductor_hoverdown_offset))
 
     if name == "Under a Killing Moon":
-        credit_offset = find_offset(page_data, "and developed by", 0, "opening credits")
-        credit_data = b"(c) 1993.        \rMouselook v1.2 (c) 2025 moralrecordings.    \r                                "
-        DATA_PATCHES.append((credit_data, credit_offset))
+        try:
+            credit_offset = find_offset(
+                page_data, "and developed by", 0, "opening credits"
+            )
+            credit_data = b"(c) 1993.        \rMouselook v1.2 (c) 2025 moralrecordings.    \r                                "
+            DATA_PATCHES.append((credit_data, credit_offset))
+        except DataNotFound:
+            pass
 
     # Apply the code patches, change the fixup table to match
     CODE_OBJ = 0
