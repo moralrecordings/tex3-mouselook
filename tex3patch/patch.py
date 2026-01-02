@@ -58,7 +58,7 @@ class DataNotFound(Exception):
 
 def detect_version(page_data: bytearray) -> tuple[str, str, str]:
     # Scrape title + version number from the command line version screen
-    VERSION_PATTERN = "\\xda\\xc4+\\xbf(?:\\x0a\\x0d|\\x0d\\x0a)\\xb3\\x20+([A-Za-z ]+)\\x20+\\xb3(?:\\x0a\\x0d|\\x0d\\x0a)\\xb3\\x20+Version ([0-9\\.]+)\\x20+\\xb3"
+    VERSION_PATTERN = "\\xda\\xc4+\\xbf(?:\\x0a\\x0d|\\x0d\\x0a)\\xb3\\x20+([A-Za-z ]+)\\x20+\\xb3(?:\\x0a\\x0d|\\x0d\\x0a)\\xb3\\x20+Version ([0-9\\.a-zA-Z]+)\\x20+\\xb3"
     result = utils.grep(VERSION_PATTERN, page_data)
     if not result:
         raise DataNotFound(

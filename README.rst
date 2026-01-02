@@ -32,6 +32,7 @@ New keyboard controls
 Version history
 ---------------
 
+- v1.4 - 2026-01-03 - Fix version detection for Italian version of UAKM
 - v1.3 - 2026-01-02 - Fix regression breaking foreign language versions
 - v1.2 - 2026-01-02 - Rewrote the patching tool to be dynamic, add mouse invert-y
 - v1.1 - 2025-08-24 - Improved screen flickering, fixed Alien Abductor in tex4
