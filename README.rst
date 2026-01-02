@@ -9,10 +9,14 @@ While this may be an accurate walking simulation for a whiskey-soaked PI, it's a
 
 As it happens, the sequel The Pandora Directive uses near identical movement code! Sometimes it really is impossible to improve on perfection.
 
-To apply the patches, you will need the `Xdelta patching tool <https://github.com/jmacd/xdelta-gpl/releases/tag/v3.1.0>`_. Windows users who are after a GUI tool might have luck with `Xdelta UI <https://www.romhacking.net/utilities/598>`_.
+This repository contains the Python command-line tool for applying the patch to TEX3.EXE or TEX4.EXE - for normal usage we recommend trying the `browser-based version <https://moralrecordings.itch.io/tex3-mouselook>`_.
 
-You can download the latest version of the patch files from the `tags page <https://github.com/moralrecordings/tex3-mouselook/tags>`_.
+Compatibility
+-------------
 
+This tool should work for all versions and language editions of Under a Killing Moon and The Pandora Directive. The patcher is dynamic - that is, it will try and read the executable, find the correct functions and variables based on code fragments, then inject the correct modifications.
+
+If you are using the GOG.COM edition of Under a Killing Moon, be aware that it uses TEX197.EXE as the game executable; you will probably want to patch this instead of TEX3.EXE.
 
 New keyboard controls 
 ---------------------
@@ -25,31 +29,10 @@ New keyboard controls
 - **[R]** - reach up on tippytoes (while held)
 - **[L-Shift]** - run (while held)
 
-Applying the Under a Killing Moon patch
----------------------------------------
-
-The patch is in VCDIFF format, and requires TEX3.EXE from the GOG.com edition of Under a Killing Moon (sha1: 6aa11ae0e6e763849dd7f44c18ce1987c6763665).
-
-.. code:: bash
-
-   xdelta3 -d -s tex3.exe tex3mod.xdelta tex3mod.exe
-
-As of July 2025, the GOG.com edition will try and run TEX197.EXE. If you want to use their bundled DOSBox to play the game, you will still need to build the patch using TEX3.EXE, but instead replace TEX197.EXE with the patched version, or edit ``dosboxTex3_single.conf`` to use the new EXE. The patched version is save-compatible with the original.
-
-Applying the Pandora Directive patch
-------------------------------------
-
-The patch is in VCDIFF format, and requires TEX4.EXE from the GOG.com edition of The Pandora Directive (sha1: 6b47d8d202a1a0e8b9fd95e374aa71db0cf128c7)
-
-.. code:: bash
-
-   xdelta3 -d -s tex4.exe tex4mod.xdelta tex4mod.exe
-
-The GOG.com edition will try and run TEX4.EXE. If you want to use their bundled DOSBox to play the game, you will need to replace TEX4.EXE with the patched version, or edit ``dosboxTex4_single.conf`` to use the new EXE. The patched version is save-compatible with the original.
-
 Version history
 ---------------
 
+- v1.2 - 2026-01-02 - Rewrote the patching tool to be dynamic, add mouse invert-y
 - v1.1 - 2025-08-24 - Improved screen flickering, fixed Alien Abductor in tex4
 - v1.0 - 2025-08-05 - Added reach control, fixed vertical mouselook clamping
 - v0.9 - 2025-07-24 - Initial release
