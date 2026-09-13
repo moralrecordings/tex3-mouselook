@@ -64,9 +64,9 @@ def detect_version(page_data: bytearray) -> tuple[str, str, str]:
         raise DataNotFound(
             "Failed to detect Under a Killing Moon or The Pandora Directive! Please create an issue on https://github.com/moralrecordings/tex3-mouselook"
         )
-    game, version = result[0].group(1).decode("ascii"), result[0].group(2).decode(
-        "ascii"
-    )
+    game, version = result[0].group(1).decode("ascii").strip(), result[0].group(
+        2
+    ).decode("ascii")
 
     # Apparently there's one debug message which has the language in it
     LANGUAGE_PATTERN = "\\x00([A-Za-z]+)\\x00Retrieving DIGI settings"
@@ -74,6 +74,10 @@ def detect_version(page_data: bytearray) -> tuple[str, str, str]:
     language = "UNKNOWN"
     if result:
         language = result[0].group(1).decode("ascii")
+
+    if game in ("Die Pandora Akte", "La Directive Pandora"):
+        # german/french localised name
+        game = "The Pandora Directive"
 
     if game not in ("Under a Killing Moon", "The Pandora Directive"):
         raise DataNotFound(
