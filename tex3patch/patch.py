@@ -1269,8 +1269,9 @@ So here we nop out the injection part.
     CODE_OBJ = 0
     DATA_OBJ = 2
     for mod_code, mod_offset in CODE_PATCHES:
-        # print("Fixups to remove:")
         PATCH_RANGE = (mod_offset, mod_offset + len(mod_code))
+        # print(f"Patching code from 0x{PATCH_RANGE[0]:08x}-0x{PATCH_RANGE[1]:08x}")
+        # print("Fixups to remove:")
         for i in range(len(fixup_records)):
             page_offset = i * le_header.page_size
             if (
@@ -1282,7 +1283,7 @@ So here we nop out the injection part.
             for j, record in enumerate(fixup_records[i]):
                 src_addr = record.srcoff + page_offset
                 if src_addr in range(PATCH_RANGE[0], PATCH_RANGE[1]):
-                    # print((i, j, hex(src_addr), record))
+                    # print((hex(src_addr), i, j, record))
                     to_remove.append(j)
             to_remove.reverse()
             for j in to_remove:
@@ -1290,13 +1291,14 @@ So here we nop out the injection part.
         # print("Fixups to add:")
         decoder = Decoder(32, mod_code)
         for instr in decoder:
-            # print((instr, instr.code))
             offset = mod_offset + instr.ip
             code = instr.code
             srcoff = offset % le_header.page_size
             page = offset // le_header.page_size
+            # print((hex(offset), instr, instr.code))
             # this is incomplete, there's hundreds of instructions in x86 which access memory.
             # I'm just adding them when I need them
+            fixup = None
             match code:
                 case (
                     Code.ADD_RM32_R32
@@ -1318,8 +1320,6 @@ So here we nop out the injection part.
                         srcoff + 2,
                         utils.from_uint32_le(mod_code[instr.ip + 2 : instr.ip + 6]),
                     )
-                    # print((page, None, hex(offset), fixup))
-                    fixup_records[page].append(fixup)
                 case Code.MOV_RM32_R32 | Code.SUB_RM32_R32:
                     # this bastard can have both memory and registers as a source operand
                     if instr.memory_displacement:
@@ -1331,8 +1331,6 @@ So here we nop out the injection part.
                             srcoff + 2,
                             utils.from_uint32_le(mod_code[instr.ip + 2 : instr.ip + 6]),
                         )
-                        # print((page, None, hex(offset), fixup))
-                        fixup_records[page].append(fixup)
                 case Code.MOV_AL_MOFFS8 | Code.MOV_MOFFS32_EAX | Code.MOV_EAX_MOFFS32:
                     fixup = FixupTuple(
                         "fix_32off_32",
@@ -1342,8 +1340,6 @@ So here we nop out the injection part.
                         srcoff + 1,
                         utils.from_uint32_le(mod_code[instr.ip + 1 : instr.ip + 5]),
                     )
-                    # print((page, None, hex(offset), fixup))
-                    fixup_records[page].append(fixup)
                 case Code.MOV_RM16_IMM16:
                     fixup = FixupTuple(
                         "fix_32off_32",
@@ -1353,8 +1349,6 @@ So here we nop out the injection part.
                         srcoff + 3,
                         utils.from_uint32_le(mod_code[instr.ip + 3 : instr.ip + 7]),
                     )
-                    # print((page, None, hex(offset), fixup))
-                    fixup_records[page].append(fixup)
                 case Code.JMP_RM32:
                     fixup = FixupTuple(
                         "fix_32off_32",
@@ -1364,8 +1358,25 @@ So here we nop out the injection part.
                         srcoff + 3,
                         utils.from_uint32_le(mod_code[instr.ip + 3 : instr.ip + 7]),
                     )
-                    # print((page, None, hex(offset), fixup))
-                    fixup_records[page].append(fixup)
+
+            if fixup is not None:
+                # print((page, None, hex(offset), fixup))
+                fixup_records[page].append(fixup)
+                # if the fixup straddles a page boundary, we need freaking two of them
+                if (
+                    fixup.id == "fix_32off_32"
+                    and le_header.page_size - fixup.srcoff < 4
+                ):
+                    fixup_2 = FixupTuple(
+                        fixup.id,
+                        fixup.src,
+                        fixup.flags,
+                        fixup.objnum,
+                        fixup.srcoff - le_header.page_size,
+                        fixup.data,
+                    )
+                    fixup_records[page + 1].append(fixup_2)
+                    # print((page+1, None, hex(offset), fixup_2))
 
         page_data[mod_offset : mod_offset + len(mod_code)] = mod_code
 

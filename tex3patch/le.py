@@ -124,7 +124,7 @@ def fixups_encode(fixups: list[FixupTuple]) -> bytes:
     for id, src, flags, objnum, srcoff, fix_data in fixups:
         buffer.append(src)
         buffer.append(flags)
-        buffer.extend(utils.to_uint16_le(srcoff))
+        buffer.extend(utils.to_int16_le(srcoff))
         buffer.append(objnum + 1)
         if id in ("fix_32off_16", "fix_16off_16", "fix_1632ptr_16"):
             buffer.extend(utils.to_uint16_le(fix_data))
@@ -144,7 +144,7 @@ def fixups_decode(buffer: bytes) -> list[FixupTuple]:
         ptr_start = fix_ptr
         src = buffer[fix_ptr]
         flags = buffer[fix_ptr + 1]
-        srcoff = utils.from_uint16_le(buffer[fix_ptr + 2 : fix_ptr + 4])
+        srcoff = utils.from_int16_le(buffer[fix_ptr + 2 : fix_ptr + 4])
         objnum = buffer[fix_ptr + 4] - 1
         fix_ptr += 5
         if src == 0x7:

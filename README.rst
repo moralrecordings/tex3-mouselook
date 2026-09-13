@@ -32,6 +32,7 @@ New keyboard controls
 Version history
 ---------------
 
+- v1.5 - 2026-09-12 - Fix detection for non-English versions of PD, fix crouching in French version of PD
 - v1.4 - 2026-01-03 - Fix version detection for Italian version of UAKM
 - v1.3 - 2026-01-02 - Fix regression breaking foreign language versions
 - v1.2 - 2026-01-02 - Rewrote the patching tool to be dynamic, add mouse invert-y
